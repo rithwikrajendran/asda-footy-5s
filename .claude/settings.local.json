@@ -6,5 +6,9 @@
       "Bash(where gh:*)",
       "Bash(git config:*)"
     ]
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
   }
 }

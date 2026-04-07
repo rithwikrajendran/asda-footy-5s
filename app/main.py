@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -22,6 +23,14 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="ASDA Footy 5s")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+
+@app.middleware("http")
+async def force_https_redirect_uri(request: Request, call_next):
+    """Ensure redirect URIs use https behind Railway's proxy."""
+    if request.headers.get("x-forwarded-proto") == "https":
+        request.scope["scheme"] = "https"
+    return await call_next(request)
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))

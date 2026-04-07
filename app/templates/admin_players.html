@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Manage Players{% endblock %}
+{% block content %}
+<h2>Manage Players</h2>
+
+<article>
+    <header><strong>Add Player</strong></header>
+    <form method="post" action="/admin/players/add">
+        <div class="grid">
+            <label>
+                Name
+                <input type="text" name="name" required>
+            </label>
+            <label>
+                USP (unique selling point)
+                <input type="text" name="usp" placeholder="e.g. Lethal left foot, best crosser">
+            </label>
+        </div>
+        <button type="submit">Add Player</button>
+    </form>
+</article>
+
+<h3>Current Players</h3>
+{% for player in players %}
+<article>
+    <form method="post" action="/admin/players/{{ player.id }}/edit">
+        <div class="grid">
+            <label>
+                Name
+                <input type="text" name="name" value="{{ player.name }}" required>
+            </label>
+            <label>
+                USP
+                <input type="text" name="usp" value="{{ player.usp or '' }}">
+            </label>
+            <label>
+                Active
+                <input type="checkbox" name="is_active" value="true" role="switch"
+                       {% if player.is_active %}checked{% endif %}>
+            </label>
+        </div>
+        <button type="submit" class="secondary">Save</button>
+    </form>
+</article>
+{% endfor %}
+{% endblock %}

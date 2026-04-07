@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Team Generator{% endblock %}
+{% block content %}
+<h2>Team Generator</h2>
+
+{% if error %}
+<article style="background: var(--del-color); padding: 0.5em 1em;">{{ error }}</article>
+{% endif %}
+
+<form method="post" action="/admin/generate">
+    <fieldset>
+        <legend>Select available players</legend>
+        {% for player in players %}
+        <label>
+            <input type="checkbox" name="players" value="{{ player.id }}"
+                   {% if selected_ids is defined and player.id in selected_ids %}checked{% endif %}>
+            {{ player.name }}
+        </label>
+        {% endfor %}
+    </fieldset>
+    <button type="submit">Generate Teams</button>
+</form>
+
+{% if team_a %}
+<div class="grid">
+    <article>
+        <header><strong>Team A</strong> (Avg: {{ avg_a }})</header>
+        <ul>
+            {% for id, name, rating in team_a %}
+            <li>{{ name }} <small>({{ rating }})</small></li>
+            {% endfor %}
+        </ul>
+    </article>
+    <article>
+        <header><strong>Team B</strong> (Avg: {{ avg_b }})</header>
+        <ul>
+            {% for id, name, rating in team_b %}
+            <li>{{ name }} <small>({{ rating }})</small></li>
+            {% endfor %}
+        </ul>
+    </article>
+</div>
+<p><small>Difference: {{ (avg_a - avg_b)|abs|round(2) }} points</small></p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}League Table{% endblock %}
+{% block content %}
+<h2>League Table</h2>
+
+{% if table %}
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Format</th>
+            <th>Team</th>
+            <th>Result</th>
+            <th>GF</th>
+            <th>GA</th>
+            <th>GD</th>
+            <th>Pts</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in table %}
+        <tr>
+            <td>{{ row.date }}</td>
+            <td>{{ row.format }}</td>
+            <td>{{ row.team }}</td>
+            <td>
+                <mark{% if row.result == 'W' %} class="win"{% elif row.result == 'L' %} class="loss"{% endif %}>
+                    {{ row.result }}
+                </mark>
+            </td>
+            <td>{{ row.gf }}</td>
+            <td>{{ row.ga }}</td>
+            <td>{{ row.gd }}</td>
+            <td><strong>{{ row.pts }}</strong></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% else %}
+<p>No matches recorded yet.</p>
+{% endif %}
+{% endblock %}

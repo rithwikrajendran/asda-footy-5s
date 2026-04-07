@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Power Rankings{% endblock %}
+{% block content %}
+<h2>Power Rankings</h2>
+<p>Assign a rank number to your top players (1 = best). Leave blank for unranked.</p>
+
+<form method="post" action="/admin/rankings">
+    <table>
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th>Rank</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for player in players %}
+            <tr>
+                <td>{{ player.name }}</td>
+                <td>
+                    <input type="number" name="rank_{{ player.id }}" min="1"
+                           value="{{ player.top_rank or '' }}" placeholder="-"
+                           style="width:80px">
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit">Save Rankings</button>
+</form>
+{% endblock %}

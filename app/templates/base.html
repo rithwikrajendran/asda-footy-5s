@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ASDA Footy 5s{% endblock %}</title>
+    <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav class="container-fluid">
+        <ul>
+            <li><a href="/" style="text-decoration:none"><img src="/static/logo.svg" alt="logo" style="height:32px;vertical-align:middle;margin-right:8px"><strong>ASDA Footy 5s</strong></a></li>
+        </ul>
+        <ul>
+            <li><a href="/">Table</a></li>
+            <li><a href="/ratings">Ratings</a></li>
+            <li><a href="/matches">Matches</a></li>
+            {% if user %}
+                <li><a href="/rate">Rate</a></li>
+                {% if user.is_admin %}
+                    <li><a href="/admin/players">Players</a></li>
+                    <li><a href="/admin/generate">Generator</a></li>
+                    <li><a href="/admin/match">Record</a></li>
+                    <li><a href="/admin/rankings">Rankings</a></li>
+                {% endif %}
+                <li><a href="/logout">Logout ({{ user.github_username }})</a></li>
+            {% else %}
+                <li><a href="/login">Login</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

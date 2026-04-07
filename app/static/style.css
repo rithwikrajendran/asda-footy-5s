@@ -1,0 +1,33 @@
+.rating-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-bottom: 0.25em;
+}
+
+.rating-label {
+    min-width: 100px;
+    font-size: 0.85em;
+}
+
+.rating-value {
+    min-width: 30px;
+    text-align: right;
+    font-weight: bold;
+    font-size: 0.85em;
+}
+
+.rating-row progress {
+    flex: 1;
+    margin: 0;
+}
+
+mark.win {
+    background: var(--ins-color);
+    color: var(--contrast);
+}
+
+mark.loss {
+    background: var(--del-color);
+    color: var(--contrast);
+}

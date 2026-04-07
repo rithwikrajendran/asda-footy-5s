@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Record Match{% endblock %}
+{% block content %}
+<h2>Record Match</h2>
+
+<form method="post" action="/admin/match">
+    <div class="grid">
+        <label>
+            Date
+            <input type="date" name="date" required>
+        </label>
+        <label>
+            Format
+            <select name="format">
+                <option value="5v5">5-a-side</option>
+                <option value="7v7">7-a-side</option>
+            </select>
+        </label>
+    </div>
+
+    <div class="grid">
+        <fieldset>
+            <legend><strong>Team A</strong></legend>
+            {% for player in players %}
+            <label>
+                <input type="checkbox" name="team_a" value="{{ player.id }}">
+                {{ player.name }}
+            </label>
+            {% endfor %}
+            <label>
+                Score
+                <input type="number" name="team_a_score" min="0" required>
+            </label>
+        </fieldset>
+
+        <fieldset>
+            <legend><strong>Team B</strong></legend>
+            {% for player in players %}
+            <label>
+                <input type="checkbox" name="team_b" value="{{ player.id }}">
+                {{ player.name }}
+            </label>
+            {% endfor %}
+            <label>
+                Score
+                <input type="number" name="team_b_score" min="0" required>
+            </label>
+        </fieldset>
+    </div>
+
+    <button type="submit">Record Match</button>
+</form>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Rate Players{% endblock %}
+{% block content %}
+<h2>Rate Players</h2>
+<p>Rate each player 1-10 for each attribute. Leave blank to skip.</p>
+
+{% if request.query_params.get('saved') %}
+<article style="background: var(--ins-color); padding: 0.5em 1em;">Ratings saved!</article>
+{% endif %}
+
+<form method="post" action="/rate">
+    {% for player in players %}
+    <details>
+        <summary><strong>{{ player.name }}</strong></summary>
+        <div class="grid">
+            {% for attr in attributes %}
+            <label>
+                {{ attr }}
+                <input type="number" name="r_{{ player.id }}_{{ attr }}"
+                       min="1" max="10" step="0.5"
+                       value="{{ existing.get((player.id, attr), '') }}"
+                       placeholder="1-10">
+            </label>
+            {% endfor %}
+        </div>
+    </details>
+    {% endfor %}
+    <button type="submit">Save All Ratings</button>
+</form>
+{% endblock %}

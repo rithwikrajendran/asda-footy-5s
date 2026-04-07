@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <!-- Ball body -->
+  <circle cx="60" cy="60" r="54" fill="#e8e8e8" stroke="#222" stroke-width="3"/>
+  <!-- Pentagon patches -->
+  <polygon points="60,20 74,32 70,48 50,48 46,32" fill="#222"/>
+  <polygon points="90,52 100,68 90,82 76,76 78,58" fill="#222"/>
+  <polygon points="30,52 42,58 44,76 30,82 20,68" fill="#222"/>
+  <polygon points="44,90 50,76 70,76 76,90 68,102" fill="#222"/>
+  <polygon points="52,102 40,94 36,80 46,72 56,78" fill="none" stroke="#222" stroke-width="1.5"/>
+  <!-- Fun flame trail -->
+  <path d="M108,58 Q120,45 115,30 Q112,42 105,48 Q115,35 110,22 Q108,38 100,46" fill="#ff6b35" opacity="0.9"/>
+  <path d="M106,66 Q118,60 116,48 Q112,56 106,58" fill="#ffaa00" opacity="0.8"/>
+  <!-- Speed lines -->
+  <line x1="2" y1="50" x2="14" y2="50" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <line x1="0" y1="60" x2="16" y2="60" stroke="#58a6ff" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/>
+  <line x1="2" y1="70" x2="14" y2="70" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+</svg>

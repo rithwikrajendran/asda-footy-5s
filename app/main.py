@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, Request, Depends, Form, HTTPException
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -13,32 +13,40 @@ from sqlalchemy.orm import Session
 
 from app.database import engine, get_db, Base
 from app.models import (
-    User, Player, PlayerRating, Match, MatchPlayer,
-    ATTRIBUTES, ATTRIBUTE_KEYS, OUTFIELD_ATTRIBUTE_KEYS, PROFILE_MAP, MATCH_FORMATS,
+    User, Player, PlayerRating, PlayerArchetype, Match, MatchPlayer,
+    ATTRIBUTES, ATTRIBUTE_KEYS, OUTFIELD_ATTRIBUTE_KEYS,
+    ARCHETYPES, ARCHETYPE_KEYS, MATCH_FORMATS,
 )
 from app.auth import oauth, get_current_user, require_login, require_admin, SECRET_KEY, ADMIN_GITHUB_USERNAME
 from app.balancer import snake_draft
 
-# Create tables and migrate schema
+# ── DB Setup & Migration ────────────────────────────────────────────────────
+
 from sqlalchemy import inspect, text
 
+
 def migrate_db():
-    """Add missing columns to existing tables."""
     inspector = inspect(engine)
+    tables = inspector.get_table_names()
     with engine.begin() as conn:
-        if "players" in inspector.get_table_names():
+        if "players" in tables:
             existing = {c["name"] for c in inspector.get_columns("players")}
             if "profile" not in existing:
                 conn.execute(text("ALTER TABLE players ADD COLUMN profile VARCHAR(200) DEFAULT ''"))
             if "age_range" not in existing:
                 conn.execute(text("ALTER TABLE players ADD COLUMN age_range VARCHAR(10) DEFAULT ''"))
-        if "player_ratings" in inspector.get_table_names():
+        if "player_ratings" in tables:
             existing = {c["name"] for c in inspector.get_columns("player_ratings")}
             if "rated_by_name" not in existing:
                 conn.execute(text("ALTER TABLE player_ratings ADD COLUMN rated_by_name VARCHAR(100)"))
+            if "comment" not in existing:
+                conn.execute(text("ALTER TABLE player_ratings ADD COLUMN comment TEXT DEFAULT ''"))
     Base.metadata.create_all(bind=engine)
 
+
 migrate_db()
+
+# ── App Setup ────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="ASDA Footy 5s")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -62,7 +70,6 @@ PLAYER_WEIGHT = 1.0
 
 
 def get_weighted_ratings(db: Session, player_id: int) -> dict:
-    """Get weighted average ratings for a player across all attributes."""
     ratings = db.query(PlayerRating).filter(PlayerRating.player_id == player_id).all()
     if not ratings:
         return {}
@@ -87,32 +94,69 @@ def get_weighted_ratings(db: Session, player_id: int) -> dict:
 
 
 def get_overall_rating(weighted_ratings: dict) -> float:
-    """Average of outfield attributes only."""
     outfield = [weighted_ratings.get(a, 0) for a in OUTFIELD_ATTRIBUTE_KEYS if a in weighted_ratings]
     return round(sum(outfield) / len(outfield), 1) if outfield else 0
 
 
-def compute_player_profile(weighted_ratings: dict) -> str:
-    """Return top 3 profile archetypes based on highest-rated attributes."""
+def compute_archetype_scores(weighted_ratings: dict) -> list:
+    """Compute all archetype scores from attribute ratings. Returns sorted list of (key, label, score)."""
     if not weighted_ratings:
-        return ""
-    sorted_attrs = sorted(weighted_ratings.items(), key=lambda x: x[1], reverse=True)
-    profiles = []
-    for attr_key, _ in sorted_attrs:
-        if attr_key in PROFILE_MAP and PROFILE_MAP[attr_key] not in profiles:
-            profiles.append(PROFILE_MAP[attr_key])
-        if len(profiles) == 3:
-            break
-    return ", ".join(profiles)
+        return []
+    results = []
+    for arch in ARCHETYPES:
+        score = sum(
+            weighted_ratings.get(attr, 0) * w
+            for attr, w in arch["weights"].items()
+        )
+        results.append((arch["key"], arch["label"], round(score, 1)))
+    results.sort(key=lambda x: x[2], reverse=True)
+    return results
 
 
-def update_player_profile(db: Session, player_id: int):
-    """Recompute and save a player's profile."""
+def update_player_data(db: Session, player_id: int):
+    """Recompute archetype scores for a player and save to DB."""
     wr = get_weighted_ratings(db, player_id)
-    profile = compute_player_profile(wr)
-    player = db.query(Player).filter(Player.id == player_id).first()
-    if player:
-        player.profile = profile
+    arch_scores = compute_archetype_scores(wr)
+
+    for key, label, score in arch_scores:
+        existing = db.query(PlayerArchetype).filter(
+            PlayerArchetype.player_id == player_id,
+            PlayerArchetype.archetype_key == key,
+        ).first()
+        if existing:
+            existing.score = score
+            existing.updated_at = datetime.utcnow()
+        else:
+            db.add(PlayerArchetype(player_id=player_id, archetype_key=key, score=score))
+
+
+def get_player_top_archetypes(db: Session, player_id: int, n: int = 3) -> list:
+    """Get top N archetype labels for a player."""
+    archs = db.query(PlayerArchetype).filter(
+        PlayerArchetype.player_id == player_id
+    ).order_by(PlayerArchetype.score.desc()).limit(n).all()
+    label_map = {a["key"]: a["label"] for a in ARCHETYPES}
+    return [(label_map.get(a.archetype_key, a.archetype_key), a.score) for a in archs if a.score > 0]
+
+
+def get_ranked_players(db: Session) -> list:
+    """Return active players ranked by overall rating (auto-rank)."""
+    players = db.query(Player).filter(Player.is_active == True).all()
+    player_data = []
+    for p in players:
+        wr = get_weighted_ratings(db, p.id)
+        overall = get_overall_rating(wr)
+        top_archs = get_player_top_archetypes(db, p.id)
+        player_data.append({
+            "player": p,
+            "ratings": wr,
+            "overall": overall,
+            "top_archetypes": top_archs,
+        })
+    player_data.sort(key=lambda x: x["overall"], reverse=True)
+    for i, pd in enumerate(player_data):
+        pd["rank"] = i + 1
+    return player_data
 
 
 def compute_league_table(db: Session) -> list:
@@ -187,22 +231,11 @@ async def league_table(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/ratings", response_class=HTMLResponse)
 async def ratings_page(request: Request, db: Session = Depends(get_db)):
-    players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
-    player_data = []
-    for p in players:
-        wr = get_weighted_ratings(db, p.id)
-        overall = get_overall_rating(wr)
-        player_data.append({"player": p, "ratings": wr, "overall": overall})
-    player_data.sort(key=lambda x: x["overall"], reverse=True)
-
-    ranked = db.query(Player).filter(
-        Player.is_active == True, Player.top_rank != None
-    ).order_by(Player.top_rank).all()
-
+    player_data = get_ranked_players(db)
     user = get_current_user(request)
     return templates.TemplateResponse("ratings.html", {
-        "request": request, "player_data": player_data, "ranked": ranked,
-        "attributes": ATTRIBUTES, "user": user,
+        "request": request, "player_data": player_data,
+        "attributes": ATTRIBUTES, "archetypes": ARCHETYPES, "user": user,
     })
 
 
@@ -218,14 +251,16 @@ async def matches_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("matches.html", {"request": request, "match_data": match_data, "user": user})
 
 
-# ── Public Rating Form (shareable, no login) ────────────────────────────────
+# ── Public Rating Form (shareable, no login, dropdown) ───────────────────────
 
 @app.get("/rate/public", response_class=HTMLResponse)
 async def public_rate_page(request: Request, db: Session = Depends(get_db)):
     players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
     user = get_current_user(request)
+    player_id = request.query_params.get("player_id")
     return templates.TemplateResponse("rate_public.html", {
-        "request": request, "players": players, "attributes": ATTRIBUTES, "user": user,
+        "request": request, "players": players, "attributes": ATTRIBUTES,
+        "user": user, "selected_player_id": int(player_id) if player_id else None,
     })
 
 
@@ -233,41 +268,69 @@ async def public_rate_page(request: Request, db: Session = Depends(get_db)):
 async def public_rate_submit(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     rater_name = form.get("rater_name", "").strip()
+    player_id = form.get("player_id")
+
+    players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
+    user = get_current_user(request)
+
     if not rater_name:
-        players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
-        user = get_current_user(request)
         return templates.TemplateResponse("rate_public.html", {
             "request": request, "players": players, "attributes": ATTRIBUTES,
             "user": user, "error": "Please enter your name.",
         })
 
-    players = db.query(Player).filter(Player.is_active == True).all()
-    for player in players:
-        for attr in ATTRIBUTES:
-            key = f"r_{player.id}_{attr['key']}"
-            value = form.get(key)
-            if value and value.strip():
-                score = float(value)
-                if not (1 <= score <= 10):
-                    continue
-                existing = db.query(PlayerRating).filter(
-                    PlayerRating.player_id == player.id,
-                    PlayerRating.rated_by_name == rater_name,
-                    PlayerRating.attribute == attr["key"],
-                ).first()
-                if existing:
-                    existing.score = score
-                    existing.updated_at = datetime.utcnow()
-                else:
-                    db.add(PlayerRating(
-                        player_id=player.id,
-                        rated_by_name=rater_name,
-                        attribute=attr["key"],
-                        score=score,
-                    ))
-        update_player_profile(db, player.id)
+    if not player_id:
+        return templates.TemplateResponse("rate_public.html", {
+            "request": request, "players": players, "attributes": ATTRIBUTES,
+            "user": user, "error": "Please select a player to rate.",
+        })
+
+    pid = int(player_id)
+    for attr in ATTRIBUTES:
+        key = f"r_{attr['key']}"
+        value = form.get(key)
+        if value and value.strip():
+            score = float(value)
+            if not (1 <= score <= 10):
+                continue
+            existing = db.query(PlayerRating).filter(
+                PlayerRating.player_id == pid,
+                PlayerRating.rated_by_name == rater_name,
+                PlayerRating.attribute == attr["key"],
+            ).first()
+            if existing:
+                existing.score = score
+                existing.updated_at = datetime.utcnow()
+            else:
+                db.add(PlayerRating(
+                    player_id=pid,
+                    rated_by_name=rater_name,
+                    attribute=attr["key"],
+                    score=score,
+                ))
+
+    # Save comment
+    comment = form.get("comment", "").strip()
+    if comment:
+        # Store comment on the first attribute rating for this player/rater
+        first_rating = db.query(PlayerRating).filter(
+            PlayerRating.player_id == pid,
+            PlayerRating.rated_by_name == rater_name,
+        ).first()
+        if first_rating:
+            first_rating.comment = comment
+
+    update_player_data(db, pid)
     db.commit()
     return RedirectResponse(url="/rate/public?saved=1", status_code=302)
+
+
+# ── API: player list for dynamic dropdown ────────────────────────────────────
+
+@app.get("/api/players")
+async def api_players(db: Session = Depends(get_db)):
+    players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
+    return [{"id": p.id, "name": p.name} for p in players]
 
 
 # ── Rate Players (authenticated) ────────────────────────────────────────────
@@ -317,7 +380,7 @@ async def rate_submit(request: Request, db: Session = Depends(get_db)):
                         attribute=attr["key"],
                         score=score,
                     ))
-        update_player_profile(db, player.id)
+        update_player_data(db, player.id)
     db.commit()
     return RedirectResponse(url="/rate?saved=1", status_code=302)
 
@@ -332,9 +395,9 @@ async def admin_players(request: Request, db: Session = Depends(get_db)):
 
 
 @app.post("/admin/players/add", response_class=HTMLResponse)
-async def admin_add_player(request: Request, name: str = Form(...), age_range: str = Form(""), usp: str = Form(""), db: Session = Depends(get_db)):
+async def admin_add_player(request: Request, name: str = Form(...), age_range: str = Form(""), db: Session = Depends(get_db)):
     require_admin(request)
-    db.add(Player(name=name, age_range=age_range, usp=usp))
+    db.add(Player(name=name, age_range=age_range))
     db.commit()
     return RedirectResponse(url="/admin/players", status_code=302)
 
@@ -342,7 +405,7 @@ async def admin_add_player(request: Request, name: str = Form(...), age_range: s
 @app.post("/admin/players/{player_id}/edit", response_class=HTMLResponse)
 async def admin_edit_player(
     request: Request, player_id: int,
-    name: str = Form(...), age_range: str = Form(""), usp: str = Form(""),
+    name: str = Form(...), age_range: str = Form(""),
     is_active: bool = Form(False),
     db: Session = Depends(get_db),
 ):
@@ -352,31 +415,9 @@ async def admin_edit_player(
         raise HTTPException(404)
     player.name = name
     player.age_range = age_range
-    player.usp = usp
     player.is_active = is_active
     db.commit()
     return RedirectResponse(url="/admin/players", status_code=302)
-
-
-# ── Admin: Rankings ─────────────────────────────────────────────────────────
-
-@app.get("/admin/rankings", response_class=HTMLResponse)
-async def admin_rankings(request: Request, db: Session = Depends(get_db)):
-    user = require_admin(request)
-    players = db.query(Player).filter(Player.is_active == True).order_by(Player.top_rank.nullsfirst(), Player.name).all()
-    return templates.TemplateResponse("admin_rankings.html", {"request": request, "players": players, "user": user})
-
-
-@app.post("/admin/rankings", response_class=HTMLResponse)
-async def admin_rankings_save(request: Request, db: Session = Depends(get_db)):
-    require_admin(request)
-    form = await request.form()
-    players = db.query(Player).filter(Player.is_active == True).all()
-    for p in players:
-        rank_val = form.get(f"rank_{p.id}")
-        p.top_rank = int(rank_val) if rank_val and rank_val.strip() else None
-    db.commit()
-    return RedirectResponse(url="/admin/rankings", status_code=302)
 
 
 # ── Admin: Record Match ─────────────────────────────────────────────────────
@@ -404,11 +445,9 @@ async def admin_match_save(request: Request, db: Session = Depends(get_db)):
     db.add(match)
     db.flush()
 
-    team_a_ids = form.getlist("team_a")
-    team_b_ids = form.getlist("team_b")
-    for pid in team_a_ids:
+    for pid in form.getlist("team_a"):
         db.add(MatchPlayer(match_id=match.id, player_id=int(pid), team="A"))
-    for pid in team_b_ids:
+    for pid in form.getlist("team_b"):
         db.add(MatchPlayer(match_id=match.id, player_id=int(pid), team="B"))
 
     db.commit()
@@ -421,9 +460,14 @@ async def admin_match_save(request: Request, db: Session = Depends(get_db)):
 async def admin_generate(request: Request, db: Session = Depends(get_db)):
     user = require_admin(request)
     players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
+    player_archs = {}
+    for p in players:
+        top = get_player_top_archetypes(db, p.id, n=2)
+        player_archs[p.id] = ", ".join(label for label, _ in top) if top else ""
     return templates.TemplateResponse("admin_generate.html", {
         "request": request, "players": players, "user": user,
         "team_a": None, "team_b": None, "formats": MATCH_FORMATS,
+        "player_archs": player_archs,
     })
 
 
@@ -435,12 +479,16 @@ async def admin_generate_teams(request: Request, db: Session = Depends(get_db)):
     game_format = form.get("format", "5v5")
 
     players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
+    player_archs = {}
+    for p in players:
+        top = get_player_top_archetypes(db, p.id, n=2)
+        player_archs[p.id] = ", ".join(label for label, _ in top) if top else ""
 
     if len(selected_ids) < 2:
         return templates.TemplateResponse("admin_generate.html", {
             "request": request, "players": players, "user": user,
             "team_a": None, "team_b": None, "error": "Select at least 2 players",
-            "formats": MATCH_FORMATS,
+            "formats": MATCH_FORMATS, "player_archs": player_archs,
         })
 
     players_with_ratings = []
@@ -459,4 +507,5 @@ async def admin_generate_teams(request: Request, db: Session = Depends(get_db)):
         "avg_a": avg_a, "avg_b": avg_b,
         "selected_ids": [int(x) for x in selected_ids],
         "formats": MATCH_FORMATS, "selected_format": game_format,
+        "player_archs": player_archs,
     })

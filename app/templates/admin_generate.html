@@ -4,7 +4,7 @@
 <h2>Team Generator</h2>
 
 {% if error is defined and error %}
-<article style="background: var(--del-color); padding: 0.5em 1em;">{{ error }}</article>
+<article style="background: #ef4444; color: #fff; padding: 0.75em 1em; border-radius: 8px;">{{ error }}</article>
 {% endif %}
 
 <form method="post" action="/admin/generate">
@@ -24,7 +24,9 @@
             <input type="checkbox" name="players" value="{{ player.id }}"
                    {% if selected_ids is defined and player.id in selected_ids %}checked{% endif %}>
             {{ player.name }}
-            {% if player.profile %}<small>({{ player.profile }})</small>{% endif %}
+            {% if player_archs.get(player.id) %}
+                <small class="profile-badge" style="margin-left:0.3em">{{ player_archs[player.id] }}</small>
+            {% endif %}
         </label>
         {% endfor %}
     </fieldset>
@@ -32,23 +34,23 @@
 </form>
 
 {% if team_a %}
-<div class="grid">
-    <article>
-        <header><strong>Team A</strong> (Avg: {{ avg_a }})</header>
-        <ul>
+<div class="grid" style="margin-top:1rem">
+    <div class="team-result">
+        <header>Team A (Avg: {{ avg_a }})</header>
+        <ul style="list-style:none;padding:0">
             {% for id, name, rating in team_a %}
-            <li>{{ name }} <small>({{ rating }})</small></li>
+            <li style="padding:0.2em 0">{{ name }} <small style="opacity:0.6">({{ rating }})</small></li>
             {% endfor %}
         </ul>
-    </article>
-    <article>
-        <header><strong>Team B</strong> (Avg: {{ avg_b }})</header>
-        <ul>
+    </div>
+    <div class="team-result">
+        <header>Team B (Avg: {{ avg_b }})</header>
+        <ul style="list-style:none;padding:0">
             {% for id, name, rating in team_b %}
-            <li>{{ name }} <small>({{ rating }})</small></li>
+            <li style="padding:0.2em 0">{{ name }} <small style="opacity:0.6">({{ rating }})</small></li>
             {% endfor %}
         </ul>
-    </article>
+    </div>
 </div>
 <p><small>Difference: {{ (avg_a - avg_b)|abs|round(2) }} points</small></p>
 {% endif %}

@@ -1,3 +1,12 @@
+/* ── Fonts ────────────────────────────────────────────────────────────── */
+html {
+    font-family: 'Lora', Georgia, serif;
+}
+
+h1, h2, h3, h4, h5, h6, strong, nav strong {
+    font-family: 'Libre Baskerville', 'Georgia', serif;
+}
+
 /* ── Base & Background ─────────────────────────────────────────────────── */
 :root {
     --pitch-dark: #0d1b0e;
@@ -154,6 +163,19 @@ article header {
 .rating-row progress::-webkit-progress-value {
     background: linear-gradient(90deg, var(--accent-dim), var(--accent));
     border-radius: 3px;
+}
+
+/* ── Rank badge ──────────────────────────────────────────────────────── */
+.rank-badge {
+    display: inline-block;
+    background: var(--gold);
+    color: #000;
+    font-family: 'Libre Baskerville', serif;
+    font-weight: 700;
+    font-size: 0.75em;
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    margin-right: 0.3em;
 }
 
 /* ── Profile badge ───────────────────────────────────────────────────── */

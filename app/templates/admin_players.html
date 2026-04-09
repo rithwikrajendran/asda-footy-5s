@@ -23,10 +23,6 @@
                     <option value="40+">40+</option>
                 </select>
             </label>
-            <label>
-                USP (unique selling point)
-                <input type="text" name="usp" placeholder="e.g. Lethal left foot, best crosser">
-            </label>
         </div>
         <button type="submit">Add Player</button>
     </form>
@@ -49,10 +45,6 @@
                     <option value="{{ r }}" {% if player.age_range == r %}selected{% endif %}>{{ r }}</option>
                     {% endfor %}
                 </select>
-            </label>
-            <label>
-                USP
-                <input type="text" name="usp" value="{{ player.usp or '' }}">
             </label>
             <label>
                 Active

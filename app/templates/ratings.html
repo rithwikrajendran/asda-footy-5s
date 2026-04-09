@@ -3,36 +3,29 @@
 {% block content %}
 <h2>Player Ratings</h2>
 
-{% if ranked %}
-<div class="power-rankings">
-    <h3>Power Rankings</h3>
-    <ol>
-        {% for p in ranked %}
-        <li>
-            <strong>{{ p.name }}</strong>
-            {% if p.profile %}<span class="profile-badge">{{ p.profile }}</span>{% endif %}
-            {% if p.usp %} — <small>{{ p.usp }}</small>{% endif %}
-        </li>
-        {% endfor %}
-    </ol>
-</div>
-{% endif %}
-
 <div class="player-grid">
 {% for pd in player_data %}
 <div class="player-card">
     <div class="player-card-header">
-        <span class="name">{{ pd.player.name }}</span>
+        <div>
+            <span class="rank-badge">#{{ pd.rank }}</span>
+            <span class="name">{{ pd.player.name }}</span>
+        </div>
         <span class="overall">{{ pd.overall }}</span>
     </div>
-    {% if pd.player.profile %}
-    <div style="margin-bottom:0.4rem"><span class="profile-badge">{{ pd.player.profile }}</span></div>
-    {% endif %}
-    <div class="player-meta">
-        {% if pd.player.age_range %}Age: {{ pd.player.age_range }}{% endif %}
-        {% if pd.player.age_range and pd.player.usp %} &middot; {% endif %}
-        {% if pd.player.usp %}<em>{{ pd.player.usp }}</em>{% endif %}
+
+    {% if pd.top_archetypes %}
+    <div style="margin-bottom:0.5rem">
+        {% for label, score in pd.top_archetypes %}
+        <span class="profile-badge">{{ label }}</span>
+        {% endfor %}
     </div>
+    {% endif %}
+
+    {% if pd.player.age_range %}
+    <div class="player-meta">Age: {{ pd.player.age_range }}</div>
+    {% endif %}
+
     {% for attr in attributes %}
     <div class="rating-row">
         <span class="rating-label" title="{{ attr.desc }}">{{ attr.label }}</span>
@@ -46,5 +39,19 @@
 
 {% if not player_data %}
 <p>No players added yet.</p>
+{% endif %}
+
+{% if archetypes %}
+<details style="margin-top:2rem">
+    <summary><strong>Archetype Guide</strong></summary>
+    <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.5rem; margin-top: 0.5rem;">
+        {% for arch in archetypes %}
+        <div style="padding:0.5rem;border:1px solid rgba(74,222,128,0.1);border-radius:6px;">
+            <strong style="color:var(--accent)">{{ arch.label }}</strong>
+            <br><small style="opacity:0.7">{{ arch.desc }}</small>
+        </div>
+        {% endfor %}
+    </div>
+</details>
 {% endif %}
 {% endblock %}

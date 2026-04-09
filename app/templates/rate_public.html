@@ -1,41 +1,60 @@
 {% extends "base.html" %}
-{% block title %}Rate Players — ASDA Footy 5s{% endblock %}
+{% block title %}Rate a Player — ASDA Footy 5s{% endblock %}
 {% block content %}
-<h2>Rate Your Teammates</h2>
-<p>Rate each player 1-10 for each skill. Be honest! Your ratings help us build balanced teams every week.</p>
+<h2>Rate a Teammate</h2>
+<p>Pick a player, rate them 1-10 on each skill, and leave a comment if you want. Your ratings help us build balanced teams.</p>
 
 {% if request.query_params.get('saved') %}
-<article style="background: var(--ins-color); padding: 0.5em 1em;">Thanks! Your ratings have been saved.</article>
+<article style="background: var(--accent); color: #000; padding: 0.75em 1em; border-radius: 8px;">
+    <strong>Thanks!</strong> Rating saved. Rate another player or close this tab.
+</article>
 {% endif %}
 
-{% if error %}
-<article style="background: var(--del-color); padding: 0.5em 1em;">{{ error }}</article>
+{% if error is defined and error %}
+<article style="background: #ef4444; color: #fff; padding: 0.75em 1em; border-radius: 8px;">{{ error }}</article>
 {% endif %}
 
 <form method="post" action="/rate/public">
-    <label>
-        <strong>Your Name</strong>
-        <input type="text" name="rater_name" required placeholder="Enter your name so we know who rated">
-    </label>
+    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <label>
+            <strong>Your Name</strong>
+            <select name="rater_name" required>
+                <option value="">— Select your name —</option>
+                {% for player in players %}
+                <option value="{{ player.name }}">{{ player.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            <strong>Player to Rate</strong>
+            <select name="player_id" required>
+                <option value="">— Select a player —</option>
+                {% for player in players %}
+                <option value="{{ player.id }}" {% if selected_player_id == player.id %}selected{% endif %}>
+                    {{ player.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+    </div>
 
     <hr>
 
-    {% for player in players %}
-    <details>
-        <summary><strong>{{ player.name }}</strong></summary>
-        <div class="grid">
-            {% for attr in attributes %}
-            <label>
-                {{ attr.label }}
-                <small style="display:block;opacity:0.7">{{ attr.desc }}</small>
-                <input type="number" name="r_{{ player.id }}_{{ attr.key }}"
-                       min="1" max="10" step="0.5"
-                       placeholder="1-10">
-            </label>
-            {% endfor %}
-        </div>
-    </details>
-    {% endfor %}
-    <button type="submit">Submit Ratings</button>
+    <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem;">
+        {% for attr in attributes %}
+        <label>
+            <strong>{{ attr.label }}</strong>
+            <small style="display:block;opacity:0.65;margin-bottom:0.25em">{{ attr.desc }}</small>
+            <input type="number" name="r_{{ attr.key }}" min="1" max="10" step="0.5" placeholder="1-10">
+        </label>
+        {% endfor %}
+    </div>
+
+    <label style="margin-top:1rem">
+        <strong>Comments</strong> <small>(optional)</small>
+        <textarea name="comment" rows="2" placeholder="Any thoughts on this player? Strengths, areas to improve..."></textarea>
+    </label>
+
+    <button type="submit">Submit Rating</button>
 </form>
 {% endblock %}

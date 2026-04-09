@@ -20,7 +20,8 @@
                     <option value="25-30">25-30</option>
                     <option value="30-35">30-35</option>
                     <option value="35-40">35-40</option>
-                    <option value="40+">40+</option>
+                    <option value="40-45">40-45</option>
+                    <option value="45+">45+</option>
                 </select>
             </label>
         </div>
@@ -41,7 +42,7 @@
                 Age Range
                 <select name="age_range">
                     <option value="">—</option>
-                    {% for r in ["16-20", "20-25", "25-30", "30-35", "35-40", "40+"] %}
+                    {% for r in ["16-20", "20-25", "25-30", "30-35", "35-40", "40-45", "45+"] %}
                     <option value="{{ r }}" {% if player.age_range == r %}selected{% endif %}>{{ r }}</option>
                     {% endfor %}
                 </select>

@@ -3,42 +3,93 @@
 {% block content %}
 <h2>League Table</h2>
 
+<!-- Filters -->
+<div class="table-filters">
+    <form method="get" action="/" class="filter-form">
+        <label>
+            Format
+            <select name="format" onchange="this.form.submit()">
+                <option value="all" {% if selected_format == 'all' %}selected{% endif %}>All Formats</option>
+                {% for f in formats %}
+                <option value="{{ f }}" {% if selected_format == f %}selected{% endif %}>{{ f }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Min. Games
+            <select name="min_games" onchange="this.form.submit()">
+                {% for n in [1, 2, 3, 5, 10] %}
+                <option value="{{ n }}" {% if min_games == n %}selected{% endif %}>{{ n }}+</option>
+                {% endfor %}
+            </select>
+        </label>
+    </form>
+</div>
+
 {% if table %}
 <div style="overflow-x:auto">
-<table>
+<table class="league-table">
     <thead>
         <tr>
-            <th>Date</th>
-            <th>Format</th>
-            <th>Team</th>
-            <th>Result</th>
+            <th class="col-rank">#</th>
+            <th class="col-name">Player</th>
+            <th>P</th>
+            <th>W</th>
+            <th>D</th>
+            <th>L</th>
             <th>GF</th>
             <th>GA</th>
             <th>GD</th>
             <th>Pts</th>
+            <th>PPG</th>
+            <th>GD/G</th>
         </tr>
     </thead>
     <tbody>
         {% for row in table %}
-        <tr>
-            <td>{{ row.date }}</td>
-            <td>{{ row.format }}</td>
-            <td>{{ row.team }}</td>
-            <td>
-                <mark class="{{ 'win' if row.result == 'W' else ('draw' if row.result == 'D' else 'loss') }}">
-                    {{ row.result }}
-                </mark>
+        <tr class="
+            {%- if row.rank == 1 %} zone-champion
+            {%- elif row.rank <= 4 %} zone-ucl
+            {%- elif row.rank == 5 %} zone-europa
+            {%- elif row.rank > table|length - 3 %} zone-relegation
+            {%- endif %}">
+            <td class="col-rank">
+                {% if row.rank == 1 %}
+                    <span class="rank-icon champion">&#9733;</span>
+                {% else %}
+                    {{ row.rank }}
+                {% endif %}
             </td>
+            <td class="col-name"><strong>{{ row.name }}</strong></td>
+            <td>{{ row.p }}</td>
+            <td class="stat-w">{{ row.w }}</td>
+            <td class="stat-d">{{ row.d }}</td>
+            <td class="stat-l">{{ row.l }}</td>
             <td>{{ row.gf }}</td>
             <td>{{ row.ga }}</td>
-            <td>{{ row.gd }}</td>
-            <td><strong>{{ row.pts }}</strong></td>
+            <td class="{% if row.gd > 0 %}gd-pos{% elif row.gd < 0 %}gd-neg{% endif %}">
+                {% if row.gd > 0 %}+{% endif %}{{ row.gd }}
+            </td>
+            <td class="col-pts"><strong>{{ row.pts }}</strong></td>
+            <td>{{ row.ppg }}</td>
+            <td class="{% if row.gdpg > 0 %}gd-pos{% elif row.gdpg < 0 %}gd-neg{% endif %}">
+                {% if row.gdpg > 0 %}+{% endif %}{{ row.gdpg }}
+            </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 </div>
+
+<!-- Legend -->
+<div class="table-legend">
+    <span class="legend-item"><span class="legend-dot champion-dot"></span> Champion</span>
+    <span class="legend-item"><span class="legend-dot ucl-dot"></span> Champions League</span>
+    <span class="legend-item"><span class="legend-dot europa-dot"></span> Europa League</span>
+    <span class="legend-item"><span class="legend-dot relegation-dot"></span> Relegation</span>
+</div>
+
 {% else %}
-<p>No matches recorded yet.</p>
+<p>No matches recorded yet{% if selected_format != 'all' %} for {{ selected_format }}{% endif %}.</p>
 {% endif %}
 {% endblock %}

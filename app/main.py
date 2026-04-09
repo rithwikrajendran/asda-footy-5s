@@ -194,25 +194,49 @@ def get_ranked_players(db: Session) -> list:
     return player_data
 
 
-def compute_league_table(db: Session) -> list:
-    matches = db.query(Match).order_by(Match.date.desc()).all()
-    table = []
-    for match in matches:
-        sa, sb = match.team_a_score, match.team_b_score
-        team_a_names = [mp.player.name for mp in match.players if mp.team == "A"]
-        team_b_names = [mp.player.name for mp in match.players if mp.team == "B"]
+def compute_league_table(db: Session, format_filter: str = "all", min_games: int = 1) -> list:
+    """Compute per-player league table. Returns sorted list of player stat dicts."""
+    matches = db.query(Match).all()
+    stats = {}  # player_id -> {name, p, w, d, l, gf, ga, pts}
 
-        for team_names, gf, ga in [(team_a_names, sa, sb), (team_b_names, sb, sa)]:
+    for match in matches:
+        if format_filter != "all" and match.format != format_filter:
+            continue
+        sa, sb = match.team_a_score, match.team_b_score
+        team_a = [(mp.player_id, mp.player.name) for mp in match.players if mp.team == "A"]
+        team_b = [(mp.player_id, mp.player.name) for mp in match.players if mp.team == "B"]
+
+        for team, gf, ga in [(team_a, sa, sb), (team_b, sb, sa)]:
             result = "W" if gf > ga else ("D" if gf == ga else "L")
-            table.append({
-                "match_id": match.id,
-                "date": match.date.strftime("%d %b %Y"),
-                "format": match.format,
-                "team": ", ".join(sorted(team_names)),
-                "gf": gf, "ga": ga, "gd": gf - ga,
-                "result": result,
-                "pts": 3 if result == "W" else (1 if result == "D" else 0),
-            })
+            for pid, pname in team:
+                if pid not in stats:
+                    stats[pid] = {"name": pname, "p": 0, "w": 0, "d": 0, "l": 0, "gf": 0, "ga": 0, "pts": 0}
+                s = stats[pid]
+                s["p"] += 1
+                s["gf"] += gf
+                s["ga"] += ga
+                if result == "W":
+                    s["w"] += 1
+                    s["pts"] += 3
+                elif result == "D":
+                    s["d"] += 1
+                    s["pts"] += 1
+                else:
+                    s["l"] += 1
+
+    # Build table, filter by min games, sort by pts then GD then GF
+    table = []
+    for pid, s in stats.items():
+        if s["p"] < min_games:
+            continue
+        gd = s["gf"] - s["ga"]
+        ppg = round(s["pts"] / s["p"], 2) if s["p"] > 0 else 0
+        gdpg = round(gd / s["p"], 2) if s["p"] > 0 else 0
+        table.append({**s, "gd": gd, "ppg": ppg, "gdpg": gdpg, "player_id": pid})
+
+    table.sort(key=lambda x: (x["pts"], x["gd"], x["gf"]), reverse=True)
+    for i, row in enumerate(table):
+        row["rank"] = i + 1
     return table
 
 
@@ -259,9 +283,15 @@ async def logout(request: Request):
 
 @app.get("/", response_class=HTMLResponse)
 async def league_table(request: Request, db: Session = Depends(get_db)):
-    table = compute_league_table(db)
+    format_filter = request.query_params.get("format", "all")
+    min_games = int(request.query_params.get("min_games", "1"))
+    table = compute_league_table(db, format_filter=format_filter, min_games=min_games)
     user = get_current_user(request)
-    return templates.TemplateResponse("table.html", {"request": request, "table": table, "user": user})
+    return templates.TemplateResponse("table.html", {
+        "request": request, "table": table, "user": user,
+        "formats": MATCH_FORMATS, "selected_format": format_filter,
+        "min_games": min_games,
+    })
 
 
 @app.get("/ratings", response_class=HTMLResponse)
@@ -292,14 +322,35 @@ async def ratings_page(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/matches", response_class=HTMLResponse)
 async def matches_page(request: Request, db: Session = Depends(get_db)):
+    format_filter = request.query_params.get("format", "all")
+    player_filter = request.query_params.get("player", "all")
     matches = db.query(Match).order_by(Match.date.desc()).all()
     match_data = []
+    all_player_names = set()
     for m in matches:
         team_a = [mp.player.name for mp in m.players if mp.team == "A"]
         team_b = [mp.player.name for mp in m.players if mp.team == "B"]
-        match_data.append({"match": m, "team_a": team_a, "team_b": team_b})
+        all_player_names.update(team_a + team_b)
+        # Apply filters
+        if format_filter != "all" and m.format != format_filter:
+            continue
+        if player_filter != "all" and player_filter not in team_a and player_filter not in team_b:
+            continue
+        # Determine result label
+        sa, sb = m.team_a_score, m.team_b_score
+        if sa > sb:
+            result = "Team A Win"
+        elif sb > sa:
+            result = "Team B Win"
+        else:
+            result = "Draw"
+        match_data.append({"match": m, "team_a": team_a, "team_b": team_b, "result": result})
     user = get_current_user(request)
-    return templates.TemplateResponse("matches.html", {"request": request, "match_data": match_data, "user": user})
+    return templates.TemplateResponse("matches.html", {
+        "request": request, "match_data": match_data, "user": user,
+        "formats": MATCH_FORMATS, "selected_format": format_filter,
+        "player_names": sorted(all_player_names), "selected_player": player_filter,
+    })
 
 
 # ── Public Rating Form (shareable, no login, dropdown) ───────────────────────

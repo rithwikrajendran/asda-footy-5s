@@ -3,31 +3,73 @@
 {% block content %}
 <h2>Match History</h2>
 
+<!-- Filters -->
+<div class="table-filters">
+    <form method="get" action="/matches" class="filter-form">
+        <label>
+            Format
+            <select name="format" onchange="this.form.submit()">
+                <option value="all" {% if selected_format == 'all' %}selected{% endif %}>All Formats</option>
+                {% for f in formats %}
+                <option value="{{ f }}" {% if selected_format == f %}selected{% endif %}>{{ f }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Player
+            <select name="player" onchange="this.form.submit()">
+                <option value="all" {% if selected_player == 'all' %}selected{% endif %}>All Players</option>
+                {% for name in player_names %}
+                <option value="{{ name }}" {% if selected_player == name %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+    </form>
+</div>
+
+{% if match_data %}
+<div class="match-list">
 {% for md in match_data %}
-<div class="match-card">
-    <div class="match-header">
-        <span>{{ md.match.date.strftime('%d %b %Y') }}</span>
-        <span>{{ md.match.format }}</span>
+<div class="match-card-v2">
+    <div class="match-meta">
+        <span class="match-date">{{ md.match.date.strftime('%d %b %Y') }}</span>
+        <span class="match-format-badge">{{ md.match.format }}</span>
     </div>
-    <div class="match-teams">
-        <div>
-            <h4>Team A</h4>
-            <ul>
-                {% for name in md.team_a %}<li>{{ name }}</li>{% endfor %}
-            </ul>
+    <div class="match-body">
+        <div class="match-team match-team-left {% if md.match.team_a_score > md.match.team_b_score %}match-team-winner{% endif %}">
+            <div class="match-team-label">Team A</div>
+            {% for name in md.team_a %}
+            <div class="match-player-name">{{ name }}</div>
+            {% endfor %}
         </div>
-        <div class="match-score">{{ md.match.team_a_score }} - {{ md.match.team_b_score }}</div>
-        <div style="text-align:right">
-            <h4>Team B</h4>
-            <ul style="text-align:right">
-                {% for name in md.team_b %}<li>{{ name }}</li>{% endfor %}
-            </ul>
+        <div class="match-scoreboard">
+            <div class="match-score-big">
+                <span class="{% if md.match.team_a_score > md.match.team_b_score %}score-winner{% elif md.match.team_a_score < md.match.team_b_score %}score-loser{% endif %}">{{ md.match.team_a_score }}</span>
+                <span class="score-divider">:</span>
+                <span class="{% if md.match.team_b_score > md.match.team_a_score %}score-winner{% elif md.match.team_b_score < md.match.team_a_score %}score-loser{% endif %}">{{ md.match.team_b_score }}</span>
+            </div>
+            <div class="match-result-label
+                {%- if md.match.team_a_score > md.match.team_b_score %} result-win
+                {%- elif md.match.team_a_score < md.match.team_b_score %} result-loss
+                {%- else %} result-draw{% endif %}">
+                {{ md.result }}
+            </div>
+        </div>
+        <div class="match-team match-team-right {% if md.match.team_b_score > md.match.team_a_score %}match-team-winner{% endif %}">
+            <div class="match-team-label">Team B</div>
+            {% for name in md.team_b %}
+            <div class="match-player-name">{{ name }}</div>
+            {% endfor %}
         </div>
     </div>
 </div>
 {% endfor %}
+</div>
 
-{% if not match_data %}
-<p>No matches recorded yet.</p>
+{% else %}
+<p>No matches recorded yet
+    {%- if selected_format != 'all' %} for {{ selected_format }}{% endif %}
+    {%- if selected_player != 'all' %} involving {{ selected_player }}{% endif %}.
+</p>
 {% endif %}
 {% endblock %}

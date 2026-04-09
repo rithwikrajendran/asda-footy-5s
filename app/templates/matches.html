@@ -28,39 +28,58 @@
 </div>
 
 {% if match_data %}
-<div class="match-list">
+<div class="scorecard-list">
 {% for md in match_data %}
-<div class="match-card-v2">
-    <div class="match-meta">
-        <span class="match-date">{{ md.match.date.strftime('%d %b %Y') }}</span>
-        <span class="match-format-badge">{{ md.match.format }}</span>
+{% set sa = md.match.team_a_score %}
+{% set sb = md.match.team_b_score %}
+<div class="scorecard">
+    <!-- Top bar: date + format -->
+    <div class="sc-topbar">
+        <span class="sc-date">{{ md.match.date.strftime('%d %b %Y') }}</span>
+        <span class="sc-format">{{ md.match.format }}</span>
     </div>
-    <div class="match-body">
-        <div class="match-team match-team-left {% if md.match.team_a_score > md.match.team_b_score %}match-team-winner{% endif %}">
-            <div class="match-team-label">Team A</div>
-            {% for name in md.team_a %}
-            <div class="match-player-name">{{ name }}</div>
-            {% endfor %}
-        </div>
-        <div class="match-scoreboard">
-            <div class="match-score-big">
-                <span class="{% if md.match.team_a_score > md.match.team_b_score %}score-winner{% elif md.match.team_a_score < md.match.team_b_score %}score-loser{% endif %}">{{ md.match.team_a_score }}</span>
-                <span class="score-divider">:</span>
-                <span class="{% if md.match.team_b_score > md.match.team_a_score %}score-winner{% elif md.match.team_b_score < md.match.team_a_score %}score-loser{% endif %}">{{ md.match.team_b_score }}</span>
-            </div>
-            <div class="match-result-label
-                {%- if md.match.team_a_score > md.match.team_b_score %} result-win
-                {%- elif md.match.team_a_score < md.match.team_b_score %} result-loss
-                {%- else %} result-draw{% endif %}">
-                {{ md.result }}
+
+    <!-- Main body -->
+    <div class="sc-body">
+        <!-- Team A side -->
+        <div class="sc-side sc-side-left {% if sa > sb %}sc-side-winner{% endif %}">
+            <div class="sc-team-name">Team A</div>
+            <div class="sc-roster">
+                {% for name in md.team_a %}
+                <div class="sc-player">{{ name }}</div>
+                {% endfor %}
             </div>
         </div>
-        <div class="match-team match-team-right {% if md.match.team_b_score > md.match.team_a_score %}match-team-winner{% endif %}">
-            <div class="match-team-label">Team B</div>
-            {% for name in md.team_b %}
-            <div class="match-player-name">{{ name }}</div>
-            {% endfor %}
+
+        <!-- Centre scorebox -->
+        <div class="sc-centre">
+            <div class="sc-scorebox">
+                <div class="sc-score {% if sa > sb %}sc-score-win{% elif sa < sb %}sc-score-lose{% else %}sc-score-draw{% endif %}">{{ sa }}</div>
+                <div class="sc-score-sep"></div>
+                <div class="sc-score {% if sb > sa %}sc-score-win{% elif sb < sa %}sc-score-lose{% else %}sc-score-draw{% endif %}">{{ sb }}</div>
+            </div>
+            <div class="sc-ft">FT</div>
         </div>
+
+        <!-- Team B side -->
+        <div class="sc-side sc-side-right {% if sb > sa %}sc-side-winner{% endif %}">
+            <div class="sc-team-name">Team B</div>
+            <div class="sc-roster">
+                {% for name in md.team_b %}
+                <div class="sc-player">{{ name }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom result strip -->
+    <div class="sc-result-strip
+        {%- if sa > sb %} sc-strip-a
+        {%- elif sb > sa %} sc-strip-b
+        {%- else %} sc-strip-draw{% endif %}">
+        {% if sa > sb %}Team A Win
+        {% elif sb > sa %}Team B Win
+        {% else %}Draw{% endif %}
     </div>
 </div>
 {% endfor %}

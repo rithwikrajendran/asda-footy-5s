@@ -19,8 +19,26 @@ from app.models import (
 from app.auth import oauth, get_current_user, require_login, require_admin, SECRET_KEY, ADMIN_GITHUB_USERNAME
 from app.balancer import snake_draft
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Create tables and migrate schema
+from sqlalchemy import inspect, text
+
+def migrate_db():
+    """Add missing columns to existing tables."""
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        if "players" in inspector.get_table_names():
+            existing = {c["name"] for c in inspector.get_columns("players")}
+            if "profile" not in existing:
+                conn.execute(text("ALTER TABLE players ADD COLUMN profile VARCHAR(200) DEFAULT ''"))
+            if "age_range" not in existing:
+                conn.execute(text("ALTER TABLE players ADD COLUMN age_range VARCHAR(10) DEFAULT ''"))
+        if "player_ratings" in inspector.get_table_names():
+            existing = {c["name"] for c in inspector.get_columns("player_ratings")}
+            if "rated_by_name" not in existing:
+                conn.execute(text("ALTER TABLE player_ratings ADD COLUMN rated_by_name VARCHAR(100)"))
+    Base.metadata.create_all(bind=engine)
+
+migrate_db()
 
 app = FastAPI(title="ASDA Footy 5s")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)

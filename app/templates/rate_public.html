@@ -30,7 +30,7 @@
             <select name="player_id" required>
                 <option value="">— Select a player —</option>
                 {% for player in players %}
-                <option value="{{ player.id }}" {% if selected_player_id == player.id %}selected{% endif %}>
+                <option value="{{ player.id }}" {% if selected_player_id is defined and selected_player_id == player.id %}selected{% endif %}>
                     {{ player.name }}
                 </option>
                 {% endfor %}

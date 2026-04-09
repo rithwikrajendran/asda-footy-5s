@@ -41,6 +41,15 @@ def migrate_db():
                 conn.execute(text("ALTER TABLE player_ratings ADD COLUMN rated_by_name VARCHAR(100)"))
             if "comment" not in existing:
                 conn.execute(text("ALTER TABLE player_ratings ADD COLUMN comment TEXT DEFAULT ''"))
+            # Fix unique constraint to include rated_by_name
+            try:
+                conn.execute(text("ALTER TABLE player_ratings DROP CONSTRAINT IF EXISTS uq_player_rater_attr"))
+                conn.execute(text(
+                    "ALTER TABLE player_ratings ADD CONSTRAINT uq_player_rater_attr "
+                    "UNIQUE (player_id, rated_by_user_id, rated_by_name, attribute)"
+                ))
+            except Exception:
+                pass  # SQLite doesn't support ALTER CONSTRAINT
     Base.metadata.create_all(bind=engine)
 
 
@@ -277,12 +286,14 @@ async def public_rate_submit(request: Request, db: Session = Depends(get_db)):
         return templates.TemplateResponse("rate_public.html", {
             "request": request, "players": players, "attributes": ATTRIBUTES,
             "user": user, "error": "Please enter your name.",
+            "selected_player_id": int(player_id) if player_id else None,
         })
 
     if not player_id:
         return templates.TemplateResponse("rate_public.html", {
             "request": request, "players": players, "attributes": ATTRIBUTES,
             "user": user, "error": "Please select a player to rate.",
+            "selected_player_id": None,
         })
 
     pid = int(player_id)

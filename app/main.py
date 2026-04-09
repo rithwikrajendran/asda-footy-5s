@@ -41,15 +41,16 @@ def migrate_db():
                 conn.execute(text("ALTER TABLE player_ratings ADD COLUMN rated_by_name VARCHAR(100)"))
             if "comment" not in existing:
                 conn.execute(text("ALTER TABLE player_ratings ADD COLUMN comment TEXT DEFAULT ''"))
+            # Allow NULL on rated_by_user_id for public form ratings
+            try:
+                conn.execute(text("ALTER TABLE player_ratings ALTER COLUMN rated_by_user_id DROP NOT NULL"))
+            except Exception:
+                pass
             # Fix unique constraint to include rated_by_name
             try:
                 conn.execute(text("ALTER TABLE player_ratings DROP CONSTRAINT IF EXISTS uq_player_rater_attr"))
-                conn.execute(text(
-                    "ALTER TABLE player_ratings ADD CONSTRAINT uq_player_rater_attr "
-                    "UNIQUE (player_id, rated_by_user_id, rated_by_name, attribute)"
-                ))
             except Exception:
-                pass  # SQLite doesn't support ALTER CONSTRAINT
+                pass
     Base.metadata.create_all(bind=engine)
 
 
@@ -275,6 +276,9 @@ async def public_rate_page(request: Request, db: Session = Depends(get_db)):
 
 @app.post("/rate/public", response_class=HTMLResponse)
 async def public_rate_submit(request: Request, db: Session = Depends(get_db)):
+    import logging
+    logger = logging.getLogger("uvicorn.error")
+
     form = await request.form()
     rater_name = form.get("rater_name", "").strip()
     player_id = form.get("player_id")
@@ -296,44 +300,58 @@ async def public_rate_submit(request: Request, db: Session = Depends(get_db)):
             "selected_player_id": None,
         })
 
-    pid = int(player_id)
-    for attr in ATTRIBUTES:
-        key = f"r_{attr['key']}"
-        value = form.get(key)
-        if value and value.strip():
-            score = float(value)
-            if not (1 <= score <= 10):
-                continue
-            existing = db.query(PlayerRating).filter(
+    try:
+        pid = int(player_id)
+        for attr in ATTRIBUTES:
+            key = f"r_{attr['key']}"
+            value = form.get(key)
+            if value and value.strip():
+                score = float(value)
+                if not (1 <= score <= 10):
+                    continue
+                existing = db.query(PlayerRating).filter(
+                    PlayerRating.player_id == pid,
+                    PlayerRating.rated_by_name == rater_name,
+                    PlayerRating.rated_by_user_id == None,
+                    PlayerRating.attribute == attr["key"],
+                ).first()
+                if existing:
+                    existing.score = score
+                    existing.updated_at = datetime.utcnow()
+                else:
+                    db.add(PlayerRating(
+                        player_id=pid,
+                        rated_by_name=rater_name,
+                        rated_by_user_id=None,
+                        attribute=attr["key"],
+                        score=score,
+                    ))
+                db.flush()
+
+        db.flush()
+
+        # Save comment
+        comment = form.get("comment", "").strip()
+        if comment:
+            first_rating = db.query(PlayerRating).filter(
                 PlayerRating.player_id == pid,
                 PlayerRating.rated_by_name == rater_name,
-                PlayerRating.attribute == attr["key"],
             ).first()
-            if existing:
-                existing.score = score
-                existing.updated_at = datetime.utcnow()
-            else:
-                db.add(PlayerRating(
-                    player_id=pid,
-                    rated_by_name=rater_name,
-                    attribute=attr["key"],
-                    score=score,
-                ))
+            if first_rating:
+                first_rating.comment = comment
 
-    # Save comment
-    comment = form.get("comment", "").strip()
-    if comment:
-        # Store comment on the first attribute rating for this player/rater
-        first_rating = db.query(PlayerRating).filter(
-            PlayerRating.player_id == pid,
-            PlayerRating.rated_by_name == rater_name,
-        ).first()
-        if first_rating:
-            first_rating.comment = comment
+        update_player_data(db, pid)
+        db.commit()
+        return RedirectResponse(url="/rate/public?saved=1", status_code=302)
 
-    update_player_data(db, pid)
-    db.commit()
-    return RedirectResponse(url="/rate/public?saved=1", status_code=302)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Public rate submit error: {type(e).__name__}: {e}")
+        return templates.TemplateResponse("rate_public.html", {
+            "request": request, "players": players, "attributes": ATTRIBUTES,
+            "user": user, "selected_player_id": int(player_id) if player_id else None,
+            "error": f"Something went wrong: {type(e).__name__}. Please try again.",
+        })
 
 
 # ── API: player list for dynamic dropdown ────────────────────────────────────

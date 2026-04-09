@@ -3,11 +3,20 @@
 {% block content %}
 <h2>Team Generator</h2>
 
-{% if error %}
+{% if error is defined and error %}
 <article style="background: var(--del-color); padding: 0.5em 1em;">{{ error }}</article>
 {% endif %}
 
 <form method="post" action="/admin/generate">
+    <label>
+        Format
+        <select name="format">
+            {% for f in formats %}
+            <option value="{{ f }}" {% if selected_format is defined and selected_format == f %}selected{% endif %}>{{ f }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
     <fieldset>
         <legend>Select available players</legend>
         {% for player in players %}
@@ -15,6 +24,7 @@
             <input type="checkbox" name="players" value="{{ player.id }}"
                    {% if selected_ids is defined and player.id in selected_ids %}checked{% endif %}>
             {{ player.name }}
+            {% if player.profile %}<small>({{ player.profile }})</small>{% endif %}
         </label>
         {% endfor %}
     </fieldset>

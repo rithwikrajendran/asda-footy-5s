@@ -12,8 +12,9 @@
         <label>
             Format
             <select name="format">
-                <option value="5v5">5-a-side</option>
-                <option value="7v7">7-a-side</option>
+                {% for f in formats %}
+                <option value="{{ f }}">{{ f }}</option>
+                {% endfor %}
             </select>
         </label>
     </div>

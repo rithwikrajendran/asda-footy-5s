@@ -9,12 +9,13 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.database import engine, get_db, Base
-from app.models import User, Player, PlayerRating, Match, MatchPlayer, ATTRIBUTES, OUTFIELD_ATTRIBUTES, GK_ATTRIBUTES
+from app.models import (
+    User, Player, PlayerRating, Match, MatchPlayer,
+    ATTRIBUTES, ATTRIBUTE_KEYS, OUTFIELD_ATTRIBUTE_KEYS, PROFILE_MAP, MATCH_FORMATS,
+)
 from app.auth import oauth, get_current_user, require_login, require_admin, SECRET_KEY, ADMIN_GITHUB_USERNAME
 from app.balancer import snake_draft
 
@@ -27,12 +28,12 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 @app.middleware("http")
 async def force_https_redirect_uri(request: Request, call_next):
-    """Ensure redirect URIs use https behind Railway's proxy."""
     if request.headers.get("x-forwarded-proto") == "https":
         request.scope["scheme"] = "https"
     return await call_next(request)
-app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 
+
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
 
@@ -52,8 +53,11 @@ def get_weighted_ratings(db: Session, player_id: int) -> dict:
     for r in ratings:
         if r.attribute not in attr_scores:
             attr_scores[r.attribute] = {"weighted_sum": 0, "weight_total": 0}
-        user = db.query(User).filter(User.id == r.rated_by_user_id).first()
-        weight = ADMIN_WEIGHT if user and user.is_admin else PLAYER_WEIGHT
+        weight = PLAYER_WEIGHT
+        if r.rated_by_user_id:
+            user = db.query(User).filter(User.id == r.rated_by_user_id).first()
+            if user and user.is_admin:
+                weight = ADMIN_WEIGHT
         attr_scores[r.attribute]["weighted_sum"] += r.score * weight
         attr_scores[r.attribute]["weight_total"] += weight
 
@@ -66,43 +70,34 @@ def get_weighted_ratings(db: Session, player_id: int) -> dict:
 
 def get_overall_rating(weighted_ratings: dict) -> float:
     """Average of outfield attributes only."""
-    outfield = [weighted_ratings.get(a, 0) for a in OUTFIELD_ATTRIBUTES if a in weighted_ratings]
+    outfield = [weighted_ratings.get(a, 0) for a in OUTFIELD_ATTRIBUTE_KEYS if a in weighted_ratings]
     return round(sum(outfield) / len(outfield), 1) if outfield else 0
 
 
-def compute_standings(db: Session) -> list:
-    """Compute league table from matches. Each player's team results contribute."""
-    matches = db.query(Match).order_by(Match.date.desc()).all()
+def compute_player_profile(weighted_ratings: dict) -> str:
+    """Return top 3 profile archetypes based on highest-rated attributes."""
+    if not weighted_ratings:
+        return ""
+    sorted_attrs = sorted(weighted_ratings.items(), key=lambda x: x[1], reverse=True)
+    profiles = []
+    for attr_key, _ in sorted_attrs:
+        if attr_key in PROFILE_MAP and PROFILE_MAP[attr_key] not in profiles:
+            profiles.append(PROFILE_MAP[attr_key])
+        if len(profiles) == 3:
+            break
+    return ", ".join(profiles)
 
-    # Track team-level stats per match (not individual)
-    # We'll track unique team compositions
-    team_records = {}  # team_key -> {w, d, l, gf, ga}
 
-    for match in matches:
-        team_a_players = sorted([mp.player_id for mp in match.players if mp.team == "A"])
-        team_b_players = sorted([mp.player_id for mp in match.players if mp.team == "B"])
-
-        key_a = f"A_{match.id}"
-        key_b = f"B_{match.id}"
-
-        sa, sb = match.team_a_score, match.team_b_score
-
-        team_records[key_a] = {
-            "match_id": match.id, "team": "A", "date": match.date, "format": match.format,
-            "players": team_a_players, "gf": sa, "ga": sb,
-            "w": 1 if sa > sb else 0, "d": 1 if sa == sb else 0, "l": 1 if sa < sb else 0,
-        }
-        team_records[key_b] = {
-            "match_id": match.id, "team": "B", "date": match.date, "format": match.format,
-            "players": team_b_players, "gf": sb, "ga": sa,
-            "w": 1 if sb > sa else 0, "d": 1 if sb == sa else 0, "l": 1 if sb < sa else 0,
-        }
-
-    return sorted(team_records.values(), key=lambda x: x["date"], reverse=True)
+def update_player_profile(db: Session, player_id: int):
+    """Recompute and save a player's profile."""
+    wr = get_weighted_ratings(db, player_id)
+    profile = compute_player_profile(wr)
+    player = db.query(Player).filter(Player.id == player_id).first()
+    if player:
+        player.profile = profile
 
 
 def compute_league_table(db: Session) -> list:
-    """Aggregate W/D/L/GF/GA/GD/Pts across all matches, per-team-per-match."""
     matches = db.query(Match).order_by(Match.date.desc()).all()
     table = []
     for match in matches:
@@ -121,7 +116,6 @@ def compute_league_table(db: Session) -> list:
                 "result": result,
                 "pts": 3 if result == "W" else (1 if result == "D" else 0),
             })
-
     return table
 
 
@@ -139,7 +133,6 @@ async def auth_callback(request: Request, db: Session = Depends(get_db)):
     resp = await oauth.github.get("user", token=token)
     github_user = resp.json()
 
-    # Find or create user
     user = db.query(User).filter(User.github_id == github_user["id"]).first()
     if not user:
         user = User(
@@ -171,9 +164,7 @@ async def logout(request: Request):
 async def league_table(request: Request, db: Session = Depends(get_db)):
     table = compute_league_table(db)
     user = get_current_user(request)
-    return templates.TemplateResponse("table.html", {
-        "request": request, "table": table, "user": user,
-    })
+    return templates.TemplateResponse("table.html", {"request": request, "table": table, "user": user})
 
 
 @app.get("/ratings", response_class=HTMLResponse)
@@ -183,14 +174,9 @@ async def ratings_page(request: Request, db: Session = Depends(get_db)):
     for p in players:
         wr = get_weighted_ratings(db, p.id)
         overall = get_overall_rating(wr)
-        player_data.append({
-            "player": p,
-            "ratings": wr,
-            "overall": overall,
-        })
+        player_data.append({"player": p, "ratings": wr, "overall": overall})
     player_data.sort(key=lambda x: x["overall"], reverse=True)
 
-    # Power rankings
     ranked = db.query(Player).filter(
         Player.is_active == True, Player.top_rank != None
     ).order_by(Player.top_rank).all()
@@ -198,8 +184,7 @@ async def ratings_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request)
     return templates.TemplateResponse("ratings.html", {
         "request": request, "player_data": player_data, "ranked": ranked,
-        "attributes": OUTFIELD_ATTRIBUTES, "gk_attributes": GK_ATTRIBUTES,
-        "user": user,
+        "attributes": ATTRIBUTES, "user": user,
     })
 
 
@@ -210,15 +195,61 @@ async def matches_page(request: Request, db: Session = Depends(get_db)):
     for m in matches:
         team_a = [mp.player.name for mp in m.players if mp.team == "A"]
         team_b = [mp.player.name for mp in m.players if mp.team == "B"]
-        match_data.append({
-            "match": m,
-            "team_a": team_a,
-            "team_b": team_b,
-        })
+        match_data.append({"match": m, "team_a": team_a, "team_b": team_b})
     user = get_current_user(request)
-    return templates.TemplateResponse("matches.html", {
-        "request": request, "match_data": match_data, "user": user,
+    return templates.TemplateResponse("matches.html", {"request": request, "match_data": match_data, "user": user})
+
+
+# ── Public Rating Form (shareable, no login) ────────────────────────────────
+
+@app.get("/rate/public", response_class=HTMLResponse)
+async def public_rate_page(request: Request, db: Session = Depends(get_db)):
+    players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
+    user = get_current_user(request)
+    return templates.TemplateResponse("rate_public.html", {
+        "request": request, "players": players, "attributes": ATTRIBUTES, "user": user,
     })
+
+
+@app.post("/rate/public", response_class=HTMLResponse)
+async def public_rate_submit(request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+    rater_name = form.get("rater_name", "").strip()
+    if not rater_name:
+        players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
+        user = get_current_user(request)
+        return templates.TemplateResponse("rate_public.html", {
+            "request": request, "players": players, "attributes": ATTRIBUTES,
+            "user": user, "error": "Please enter your name.",
+        })
+
+    players = db.query(Player).filter(Player.is_active == True).all()
+    for player in players:
+        for attr in ATTRIBUTES:
+            key = f"r_{player.id}_{attr['key']}"
+            value = form.get(key)
+            if value and value.strip():
+                score = float(value)
+                if not (1 <= score <= 10):
+                    continue
+                existing = db.query(PlayerRating).filter(
+                    PlayerRating.player_id == player.id,
+                    PlayerRating.rated_by_name == rater_name,
+                    PlayerRating.attribute == attr["key"],
+                ).first()
+                if existing:
+                    existing.score = score
+                    existing.updated_at = datetime.utcnow()
+                else:
+                    db.add(PlayerRating(
+                        player_id=player.id,
+                        rated_by_name=rater_name,
+                        attribute=attr["key"],
+                        score=score,
+                    ))
+        update_player_profile(db, player.id)
+    db.commit()
+    return RedirectResponse(url="/rate/public?saved=1", status_code=302)
 
 
 # ── Rate Players (authenticated) ────────────────────────────────────────────
@@ -228,7 +259,6 @@ async def rate_page(request: Request, db: Session = Depends(get_db)):
     user = require_login(request)
     players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
 
-    # Get existing ratings by this user
     existing = {}
     user_ratings = db.query(PlayerRating).filter(PlayerRating.rated_by_user_id == user["id"]).all()
     for r in user_ratings:
@@ -248,7 +278,7 @@ async def rate_submit(request: Request, db: Session = Depends(get_db)):
     players = db.query(Player).filter(Player.is_active == True).all()
     for player in players:
         for attr in ATTRIBUTES:
-            key = f"r_{player.id}_{attr}"
+            key = f"r_{player.id}_{attr['key']}"
             value = form.get(key)
             if value and value.strip():
                 score = float(value)
@@ -257,7 +287,7 @@ async def rate_submit(request: Request, db: Session = Depends(get_db)):
                 existing = db.query(PlayerRating).filter(
                     PlayerRating.player_id == player.id,
                     PlayerRating.rated_by_user_id == user["id"],
-                    PlayerRating.attribute == attr,
+                    PlayerRating.attribute == attr["key"],
                 ).first()
                 if existing:
                     existing.score = score
@@ -266,9 +296,10 @@ async def rate_submit(request: Request, db: Session = Depends(get_db)):
                     db.add(PlayerRating(
                         player_id=player.id,
                         rated_by_user_id=user["id"],
-                        attribute=attr,
+                        attribute=attr["key"],
                         score=score,
                     ))
+        update_player_profile(db, player.id)
     db.commit()
     return RedirectResponse(url="/rate?saved=1", status_code=302)
 
@@ -279,15 +310,13 @@ async def rate_submit(request: Request, db: Session = Depends(get_db)):
 async def admin_players(request: Request, db: Session = Depends(get_db)):
     user = require_admin(request)
     players = db.query(Player).order_by(Player.name).all()
-    return templates.TemplateResponse("admin_players.html", {
-        "request": request, "players": players, "user": user,
-    })
+    return templates.TemplateResponse("admin_players.html", {"request": request, "players": players, "user": user})
 
 
 @app.post("/admin/players/add", response_class=HTMLResponse)
-async def admin_add_player(request: Request, name: str = Form(...), usp: str = Form(""), db: Session = Depends(get_db)):
+async def admin_add_player(request: Request, name: str = Form(...), age_range: str = Form(""), usp: str = Form(""), db: Session = Depends(get_db)):
     require_admin(request)
-    db.add(Player(name=name, usp=usp))
+    db.add(Player(name=name, age_range=age_range, usp=usp))
     db.commit()
     return RedirectResponse(url="/admin/players", status_code=302)
 
@@ -295,7 +324,7 @@ async def admin_add_player(request: Request, name: str = Form(...), usp: str = F
 @app.post("/admin/players/{player_id}/edit", response_class=HTMLResponse)
 async def admin_edit_player(
     request: Request, player_id: int,
-    name: str = Form(...), usp: str = Form(""),
+    name: str = Form(...), age_range: str = Form(""), usp: str = Form(""),
     is_active: bool = Form(False),
     db: Session = Depends(get_db),
 ):
@@ -304,6 +333,7 @@ async def admin_edit_player(
     if not player:
         raise HTTPException(404)
     player.name = name
+    player.age_range = age_range
     player.usp = usp
     player.is_active = is_active
     db.commit()
@@ -316,9 +346,7 @@ async def admin_edit_player(
 async def admin_rankings(request: Request, db: Session = Depends(get_db)):
     user = require_admin(request)
     players = db.query(Player).filter(Player.is_active == True).order_by(Player.top_rank.nullsfirst(), Player.name).all()
-    return templates.TemplateResponse("admin_rankings.html", {
-        "request": request, "players": players, "user": user,
-    })
+    return templates.TemplateResponse("admin_rankings.html", {"request": request, "players": players, "user": user})
 
 
 @app.post("/admin/rankings", response_class=HTMLResponse)
@@ -340,7 +368,7 @@ async def admin_match(request: Request, db: Session = Depends(get_db)):
     user = require_admin(request)
     players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
     return templates.TemplateResponse("admin_match.html", {
-        "request": request, "players": players, "user": user,
+        "request": request, "players": players, "user": user, "formats": MATCH_FORMATS,
     })
 
 
@@ -377,7 +405,7 @@ async def admin_generate(request: Request, db: Session = Depends(get_db)):
     players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
     return templates.TemplateResponse("admin_generate.html", {
         "request": request, "players": players, "user": user,
-        "team_a": None, "team_b": None,
+        "team_a": None, "team_b": None, "formats": MATCH_FORMATS,
     })
 
 
@@ -386,6 +414,7 @@ async def admin_generate_teams(request: Request, db: Session = Depends(get_db)):
     user = require_admin(request)
     form = await request.form()
     selected_ids = form.getlist("players")
+    game_format = form.get("format", "5v5")
 
     players = db.query(Player).filter(Player.is_active == True).order_by(Player.name).all()
 
@@ -393,6 +422,7 @@ async def admin_generate_teams(request: Request, db: Session = Depends(get_db)):
         return templates.TemplateResponse("admin_generate.html", {
             "request": request, "players": players, "user": user,
             "team_a": None, "team_b": None, "error": "Select at least 2 players",
+            "formats": MATCH_FORMATS,
         })
 
     players_with_ratings = []
@@ -410,4 +440,5 @@ async def admin_generate_teams(request: Request, db: Session = Depends(get_db)):
         "team_a": team_a, "team_b": team_b,
         "avg_a": avg_a, "avg_b": avg_b,
         "selected_ids": [int(x) for x in selected_ids],
+        "formats": MATCH_FORMATS, "selected_format": game_format,
     })

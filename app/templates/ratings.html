@@ -8,7 +8,11 @@
     <header><strong>Power Rankings</strong></header>
     <ol>
         {% for p in ranked %}
-        <li><strong>{{ p.name }}</strong>{% if p.usp %} — <small>{{ p.usp }}</small>{% endif %}</li>
+        <li>
+            <strong>{{ p.name }}</strong>
+            {% if p.profile %}<small class="profile-badge">{{ p.profile }}</small>{% endif %}
+            {% if p.usp %} — <small>{{ p.usp }}</small>{% endif %}
+        </li>
         {% endfor %}
     </ol>
 </article>
@@ -21,34 +25,23 @@
         <strong>{{ pd.player.name }}</strong>
         <span style="float:right">Overall: <strong>{{ pd.overall }}</strong></span>
     </header>
+    {% if pd.player.profile %}
+    <p><span class="profile-badge">{{ pd.player.profile }}</span></p>
+    {% endif %}
+    {% if pd.player.age_range %}
+    <p><small>Age: {{ pd.player.age_range }}</small></p>
+    {% endif %}
     {% if pd.player.usp %}
     <p><small><em>{{ pd.player.usp }}</em></small></p>
     {% endif %}
 
     {% for attr in attributes %}
     <div class="rating-row">
-        <span class="rating-label">{{ attr }}</span>
-        <progress value="{{ pd.ratings.get(attr, 0) }}" max="10"></progress>
-        <span class="rating-value">{{ pd.ratings.get(attr, '-') }}</span>
+        <span class="rating-label" title="{{ attr.desc }}">{{ attr.label }}</span>
+        <progress value="{{ pd.ratings.get(attr.key, 0) }}" max="10"></progress>
+        <span class="rating-value">{{ pd.ratings.get(attr.key, '-') }}</span>
     </div>
     {% endfor %}
-
-    {% set has_gk = namespace(found=false) %}
-    {% for attr in gk_attributes %}
-        {% if pd.ratings.get(attr) %}{% set has_gk.found = true %}{% endif %}
-    {% endfor %}
-    {% if has_gk.found %}
-    <details>
-        <summary>GK Ratings</summary>
-        {% for attr in gk_attributes %}
-        <div class="rating-row">
-            <span class="rating-label">{{ attr }}</span>
-            <progress value="{{ pd.ratings.get(attr, 0) }}" max="10"></progress>
-            <span class="rating-value">{{ pd.ratings.get(attr, '-') }}</span>
-        </div>
-        {% endfor %}
-    </details>
-    {% endif %}
 </article>
 {% endfor %}
 </div>

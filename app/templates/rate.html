@@ -15,10 +15,11 @@
         <div class="grid">
             {% for attr in attributes %}
             <label>
-                {{ attr }}
-                <input type="number" name="r_{{ player.id }}_{{ attr }}"
+                {{ attr.label }}
+                <small style="display:block;opacity:0.7">{{ attr.desc }}</small>
+                <input type="number" name="r_{{ player.id }}_{{ attr.key }}"
                        min="1" max="10" step="0.5"
-                       value="{{ existing.get((player.id, attr), '') }}"
+                       value="{{ existing.get((player.id, attr.key), '') }}"
                        placeholder="1-10">
             </label>
             {% endfor %}

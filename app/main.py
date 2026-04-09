@@ -58,7 +58,7 @@ migrate_db()
 
 # ── App Setup ────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="ASDA Footy 5s")
+app = FastAPI(title="Work Mates CL")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 
@@ -303,7 +303,7 @@ async def ratings_page(request: Request, db: Session = Depends(get_db)):
     <html lang="en" data-theme="dark">
     <head>
         <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Ratings — ASDA Footy 5s</title>
+        <title>Ratings — Work Mates CL</title>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
         <link rel="stylesheet" href="/static/style.css">
         <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Lora:wght@400;500;600;700&display=swap" rel="stylesheet">

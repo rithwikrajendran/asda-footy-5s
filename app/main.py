@@ -80,21 +80,46 @@ PLAYER_WEIGHT = 1.0
 
 
 def get_weighted_ratings(db: Session, player_id: int) -> dict:
-    ratings = db.query(PlayerRating).filter(PlayerRating.player_id == player_id).all()
+    """Compute weighted average per attribute using most recent non-NULL rating per rater."""
+    ratings = db.query(PlayerRating).filter(
+        PlayerRating.player_id == player_id,
+        PlayerRating.score != None,
+    ).all()
     if not ratings:
         return {}
 
-    attr_scores = {}
+    # Deduplicate: keep only the most recent rating per (attribute, rater)
+    # Key: (attribute, rater_key) → most recent rating
+    latest = {}
     for r in ratings:
-        if r.attribute not in attr_scores:
-            attr_scores[r.attribute] = {"weighted_sum": 0, "weight_total": 0}
+        if r.score is None:
+            continue
+        # Identify the rater: authenticated users by user_id, public by name
+        if r.rated_by_user_id:
+            rater_key = f"user:{r.rated_by_user_id}"
+        else:
+            rater_key = f"name:{(r.rated_by_name or '').lower().strip()}"
+        key = (r.attribute, rater_key)
+        existing = latest.get(key)
+        if existing is None or (r.updated_at or r.id) > (existing.updated_at or existing.id):
+            latest[key] = r
+
+    # Build weighted averages from deduplicated ratings
+    # Cache admin lookups to avoid repeated queries
+    admin_cache = {}
+    attr_scores = {}
+    for (attr, rater_key), r in latest.items():
+        if attr not in attr_scores:
+            attr_scores[attr] = {"weighted_sum": 0, "weight_total": 0}
         weight = PLAYER_WEIGHT
         if r.rated_by_user_id:
-            user = db.query(User).filter(User.id == r.rated_by_user_id).first()
-            if user and user.is_admin:
+            if r.rated_by_user_id not in admin_cache:
+                u = db.query(User).filter(User.id == r.rated_by_user_id).first()
+                admin_cache[r.rated_by_user_id] = u and u.is_admin
+            if admin_cache[r.rated_by_user_id]:
                 weight = ADMIN_WEIGHT
-        attr_scores[r.attribute]["weighted_sum"] += r.score * weight
-        attr_scores[r.attribute]["weight_total"] += weight
+        attr_scores[attr]["weighted_sum"] += r.score * weight
+        attr_scores[attr]["weight_total"] += weight
 
     return {
         attr: round(data["weighted_sum"] / data["weight_total"], 1)
@@ -241,12 +266,28 @@ async def league_table(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/ratings", response_class=HTMLResponse)
 async def ratings_page(request: Request, db: Session = Depends(get_db)):
-    player_data = get_ranked_players(db)
     user = get_current_user(request)
-    return templates.TemplateResponse("ratings.html", {
-        "request": request, "player_data": player_data,
-        "attributes": ATTRIBUTES, "archetypes": ARCHETYPES, "user": user,
-    })
+    # Temporarily hidden while ratings are being collected
+    return HTMLResponse("""
+    <!DOCTYPE html>
+    <html lang="en" data-theme="dark">
+    <head>
+        <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Ratings — ASDA Footy 5s</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+        <link rel="stylesheet" href="/static/style.css">
+        <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Lora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    </head>
+    <body>
+        <main class="container" style="text-align:center; padding-top:4rem;">
+            <h2 style="color:var(--accent);">Ratings Update In Progress</h2>
+            <p style="font-size:1.1em; opacity:0.8;">We're collecting ratings from all players. This page will be back once everyone's submitted their scores.</p>
+            <p><a href="/rate/public" role="button">Submit Your Ratings</a></p>
+            <p><a href="/">← Back to League Table</a></p>
+        </main>
+    </body>
+    </html>
+    """)
 
 
 @app.get("/matches", response_class=HTMLResponse)
@@ -300,8 +341,17 @@ async def public_rate_submit(request: Request, db: Session = Depends(get_db)):
             "selected_player_id": None,
         })
 
+    # Prevent self-rating
+    pid = int(player_id)
+    rated_player = db.query(Player).filter(Player.id == pid).first()
+    if rated_player and rated_player.name.lower().strip() == rater_name.lower().strip():
+        return templates.TemplateResponse("rate_public.html", {
+            "request": request, "players": players, "attributes": ATTRIBUTES,
+            "user": user, "error": "You can't rate yourself! Pick a different player.",
+            "selected_player_id": pid,
+        })
+
     try:
-        pid = int(player_id)
         for attr in ATTRIBUTES:
             key = f"r_{attr['key']}"
             value = form.get(key)

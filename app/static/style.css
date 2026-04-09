@@ -319,23 +319,28 @@ th {
 /* Zone colours */
 .zone-champion {
     border-left-color: var(--gold) !important;
-    background: rgba(251, 191, 36, 0.08);
+    background: rgba(251, 191, 36, 0.18) !important;
 }
+.zone-champion td { color: var(--gold); }
+.zone-champion td.col-name strong { color: var(--gold); }
 
 .zone-ucl {
     border-left-color: #3b82f6 !important;
-    background: rgba(59, 130, 246, 0.06);
+    background: rgba(59, 130, 246, 0.15) !important;
 }
+.zone-ucl td.col-name strong { color: #60a5fa; }
 
 .zone-europa {
     border-left-color: #f97316 !important;
-    background: rgba(249, 115, 22, 0.06);
+    background: rgba(249, 115, 22, 0.15) !important;
 }
+.zone-europa td.col-name strong { color: #fb923c; }
 
 .zone-relegation {
     border-left-color: #ef4444 !important;
-    background: rgba(239, 68, 68, 0.05);
+    background: rgba(239, 68, 68, 0.14) !important;
 }
+.zone-relegation td.col-name strong { color: #f87171; }
 
 .rank-icon.champion {
     color: var(--gold);

@@ -12,7 +12,10 @@
 <body>
     <nav class="container-fluid">
         <ul>
-            <li><a href="/" style="text-decoration:none"><img src="/static/logo.svg" alt="logo" style="height:32px;vertical-align:middle;margin-right:8px"><strong>ASDA Footy 5s</strong></a></li>
+            <li><a href="/" style="text-decoration:none;display:flex;align-items:center;gap:8px">
+                <img src="/static/logo.svg" alt="logo" style="height:28px">
+                <strong>ASDA Footy 5s</strong>
+            </a></li>
         </ul>
         <ul>
             <li><a href="/">Table</a></li>
@@ -26,7 +29,7 @@
                     <li><a href="/admin/match">Record</a></li>
                     <li><a href="/admin/rankings">Rankings</a></li>
                 {% endif %}
-                <li><a href="/logout">Logout ({{ user.github_username }})</a></li>
+                <li><a href="/logout" style="opacity:0.6">{{ user.github_username }}</a></li>
             {% else %}
                 <li><a href="/login">Login</a></li>
             {% endif %}
@@ -35,5 +38,8 @@
     <main class="container">
         {% block content %}{% endblock %}
     </main>
+    <footer class="container" style="text-align:center;opacity:0.3;padding:2rem 0;font-size:0.8em">
+        ASDA Footy 5s
+    </footer>
 </body>
 </html>

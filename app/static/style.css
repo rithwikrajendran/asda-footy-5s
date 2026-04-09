@@ -1,44 +1,358 @@
+/* ── Base & Background ─────────────────────────────────────────────────── */
+:root {
+    --pitch-dark: #0d1b0e;
+    --pitch-mid: #132a15;
+    --pitch-line: rgba(255,255,255,0.04);
+    --card-bg: rgba(20, 30, 22, 0.85);
+    --accent: #4ade80;
+    --accent-dim: #22c55e;
+    --gold: #fbbf24;
+}
+
+html[data-theme="dark"] {
+    --pico-background-color: var(--pitch-dark);
+    --pico-card-background-color: var(--card-bg);
+}
+
+body {
+    background:
+        /* Pitch centre line */
+        linear-gradient(180deg, transparent 49.5%, var(--pitch-line) 49.5%, var(--pitch-line) 50.5%, transparent 50.5%),
+        /* Subtle vertical stripe */
+        repeating-linear-gradient(90deg, transparent, transparent 80px, rgba(255,255,255,0.008) 80px, rgba(255,255,255,0.008) 160px),
+        /* Base gradient */
+        linear-gradient(170deg, var(--pitch-dark) 0%, var(--pitch-mid) 50%, var(--pitch-dark) 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+}
+
+/* ── Nav ──────────────────────────────────────────────────────────────── */
+nav {
+    background: rgba(0,0,0,0.4) !important;
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(74,222,128,0.15);
+    padding: 0.5rem 0;
+}
+
+nav a {
+    color: var(--accent) !important;
+    font-size: 0.9em;
+    opacity: 0.85;
+    transition: opacity 0.2s;
+}
+
+nav a:hover {
+    opacity: 1;
+}
+
+nav strong {
+    color: #fff !important;
+    font-size: 1.05em;
+}
+
+/* ── Page headings ────────────────────────────────────────────────────── */
+main h2 {
+    color: #fff;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 0.3em;
+    margin-bottom: 1em;
+}
+
+/* ── Cards (articles) ────────────────────────────────────────────────── */
+article {
+    background: var(--card-bg) !important;
+    border: 1px solid rgba(74,222,128,0.12);
+    border-radius: 8px;
+    backdrop-filter: blur(4px);
+}
+
+article header {
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+/* ── Player ratings cards ────────────────────────────────────────────── */
+.player-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.player-card {
+    background: var(--card-bg);
+    border: 1px solid rgba(74,222,128,0.12);
+    border-radius: 8px;
+    padding: 1rem;
+    backdrop-filter: blur(4px);
+}
+
+.player-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.player-card-header .name {
+    font-weight: 700;
+    font-size: 1.05em;
+    color: #fff;
+}
+
+.player-card-header .overall {
+    background: var(--accent);
+    color: #000;
+    font-weight: 800;
+    font-size: 1.1em;
+    padding: 0.15em 0.5em;
+    border-radius: 6px;
+    min-width: 36px;
+    text-align: center;
+}
+
+.player-meta {
+    margin-bottom: 0.5rem;
+    font-size: 0.85em;
+    opacity: 0.75;
+}
+
+/* ── Rating rows (compact) ───────────────────────────────────────────── */
 .rating-row {
     display: flex;
     align-items: center;
-    gap: 0.5em;
-    margin-bottom: 0.25em;
+    gap: 0.4em;
+    margin-bottom: 0.2em;
 }
 
 .rating-label {
-    min-width: 100px;
-    font-size: 0.85em;
+    min-width: 80px;
+    font-size: 0.8em;
     cursor: help;
+    opacity: 0.8;
 }
 
 .rating-value {
-    min-width: 30px;
+    min-width: 26px;
     text-align: right;
-    font-weight: bold;
-    font-size: 0.85em;
+    font-weight: 700;
+    font-size: 0.8em;
+    color: var(--accent);
 }
 
 .rating-row progress {
     flex: 1;
     margin: 0;
+    height: 6px;
 }
 
+.rating-row progress::-webkit-progress-bar {
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+}
+
+.rating-row progress::-webkit-progress-value {
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    border-radius: 3px;
+}
+
+/* ── Profile badge ───────────────────────────────────────────────────── */
+.profile-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+    color: #000;
+    padding: 0.12em 0.5em;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+/* ── Result badges ───────────────────────────────────────────────────── */
 mark.win {
-    background: var(--ins-color);
-    color: var(--contrast);
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
+}
+
+mark.draw {
+    background: var(--gold);
+    color: #000;
+    font-weight: 700;
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
 }
 
 mark.loss {
-    background: var(--del-color);
-    color: var(--contrast);
+    background: #ef4444;
+    color: #fff;
+    font-weight: 700;
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
 }
 
-.profile-badge {
-    display: inline-block;
-    background: var(--primary);
-    color: var(--primary-inverse);
-    padding: 0.15em 0.5em;
-    border-radius: 4px;
+/* ── Power Rankings ──────────────────────────────────────────────────── */
+.power-rankings {
+    background: var(--card-bg);
+    border: 1px solid rgba(251,191,36,0.2);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.power-rankings h3 {
+    color: var(--gold);
+    margin: 0 0 0.5rem 0;
+    font-size: 1em;
+}
+
+.power-rankings ol {
+    margin: 0;
+    padding-left: 1.5em;
+}
+
+.power-rankings li {
+    padding: 0.25em 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.power-rankings li:last-child {
+    border-bottom: none;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────── */
+table {
+    font-size: 0.9em;
+}
+
+th {
+    color: var(--accent) !important;
     font-size: 0.8em;
-    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.9;
+}
+
+/* ── Match cards ─────────────────────────────────────────────────────── */
+.match-card {
+    background: var(--card-bg);
+    border: 1px solid rgba(74,222,128,0.12);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.match-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+
+.match-score {
+    text-align: center;
+    font-size: 2em;
+    font-weight: 800;
+    color: #fff;
+    padding: 0.25em 0;
+}
+
+.match-teams {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+.match-teams ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.85em;
+}
+
+.match-teams li {
+    padding: 0.15em 0;
+}
+
+.match-teams h4 {
+    margin: 0 0 0.3em 0;
+    font-size: 0.8em;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ── Forms ────────────────────────────────────────────────────────────── */
+details summary {
+    cursor: pointer;
+    padding: 0.5em 0;
+}
+
+details summary strong {
+    color: #fff;
+}
+
+fieldset {
+    border-color: rgba(74,222,128,0.15);
+    border-radius: 8px;
+}
+
+legend {
+    color: var(--accent);
+}
+
+button[type="submit"] {
+    margin-top: 0.5rem;
+}
+
+/* ── Team generator results ──────────────────────────────────────────── */
+.team-result {
+    background: var(--card-bg);
+    border: 1px solid rgba(74,222,128,0.12);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.team-result header {
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+}
+
+/* ── Trophy watermark ────────────────────────────────────────────────── */
+body::after {
+    content: '';
+    position: fixed;
+    bottom: -40px;
+    right: -20px;
+    width: 280px;
+    height: 320px;
+    background: url('/static/images/facup_mini.jpeg') center/contain no-repeat;
+    opacity: 0.04;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+    .player-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .match-score {
+        font-size: 1.5em;
+    }
+
+    nav ul {
+        gap: 0.25rem;
+    }
+
+    nav a {
+        font-size: 0.8em;
+    }
 }

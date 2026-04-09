@@ -4,37 +4,35 @@
 <h2>Player Ratings</h2>
 
 {% if ranked %}
-<article>
-    <header><strong>Power Rankings</strong></header>
+<div class="power-rankings">
+    <h3>Power Rankings</h3>
     <ol>
         {% for p in ranked %}
         <li>
             <strong>{{ p.name }}</strong>
-            {% if p.profile %}<small class="profile-badge">{{ p.profile }}</small>{% endif %}
+            {% if p.profile %}<span class="profile-badge">{{ p.profile }}</span>{% endif %}
             {% if p.usp %} — <small>{{ p.usp }}</small>{% endif %}
         </li>
         {% endfor %}
     </ol>
-</article>
+</div>
 {% endif %}
 
-<div class="grid">
+<div class="player-grid">
 {% for pd in player_data %}
-<article>
-    <header>
-        <strong>{{ pd.player.name }}</strong>
-        <span style="float:right">Overall: <strong>{{ pd.overall }}</strong></span>
-    </header>
+<div class="player-card">
+    <div class="player-card-header">
+        <span class="name">{{ pd.player.name }}</span>
+        <span class="overall">{{ pd.overall }}</span>
+    </div>
     {% if pd.player.profile %}
-    <p><span class="profile-badge">{{ pd.player.profile }}</span></p>
+    <div style="margin-bottom:0.4rem"><span class="profile-badge">{{ pd.player.profile }}</span></div>
     {% endif %}
-    {% if pd.player.age_range %}
-    <p><small>Age: {{ pd.player.age_range }}</small></p>
-    {% endif %}
-    {% if pd.player.usp %}
-    <p><small><em>{{ pd.player.usp }}</em></small></p>
-    {% endif %}
-
+    <div class="player-meta">
+        {% if pd.player.age_range %}Age: {{ pd.player.age_range }}{% endif %}
+        {% if pd.player.age_range and pd.player.usp %} &middot; {% endif %}
+        {% if pd.player.usp %}<em>{{ pd.player.usp }}</em>{% endif %}
+    </div>
     {% for attr in attributes %}
     <div class="rating-row">
         <span class="rating-label" title="{{ attr.desc }}">{{ attr.label }}</span>
@@ -42,7 +40,7 @@
         <span class="rating-value">{{ pd.ratings.get(attr.key, '-') }}</span>
     </div>
     {% endfor %}
-</article>
+</div>
 {% endfor %}
 </div>
 

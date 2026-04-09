@@ -4,7 +4,7 @@
 <h2>League Table</h2>
 
 {% if table %}
-<figure>
+<div style="overflow-x:auto">
 <table>
     <thead>
         <tr>
@@ -25,7 +25,7 @@
             <td>{{ row.format }}</td>
             <td>{{ row.team }}</td>
             <td>
-                <mark{% if row.result == 'W' %} class="win"{% elif row.result == 'L' %} class="loss"{% endif %}>
+                <mark class="{{ 'win' if row.result == 'W' else ('draw' if row.result == 'D' else 'loss') }}">
                     {{ row.result }}
                 </mark>
             </td>
@@ -37,7 +37,7 @@
         {% endfor %}
     </tbody>
 </table>
-</figure>
+</div>
 {% else %}
 <p>No matches recorded yet.</p>
 {% endif %}

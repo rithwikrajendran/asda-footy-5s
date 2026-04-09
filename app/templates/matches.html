@@ -4,28 +4,27 @@
 <h2>Match History</h2>
 
 {% for md in match_data %}
-<article>
-    <header>
-        <strong>{{ md.match.date.strftime('%d %b %Y') }}</strong> — {{ md.match.format }}
-    </header>
-    <div class="grid">
+<div class="match-card">
+    <div class="match-header">
+        <span>{{ md.match.date.strftime('%d %b %Y') }}</span>
+        <span>{{ md.match.format }}</span>
+    </div>
+    <div class="match-teams">
         <div>
-            <h4>Team A ({{ md.match.team_a_score }})</h4>
+            <h4>Team A</h4>
             <ul>
                 {% for name in md.team_a %}<li>{{ name }}</li>{% endfor %}
             </ul>
         </div>
-        <div style="text-align:center;align-self:center">
-            <strong style="font-size:1.5em">{{ md.match.team_a_score }} - {{ md.match.team_b_score }}</strong>
-        </div>
-        <div>
-            <h4>Team B ({{ md.match.team_b_score }})</h4>
-            <ul>
+        <div class="match-score">{{ md.match.team_a_score }} - {{ md.match.team_b_score }}</div>
+        <div style="text-align:right">
+            <h4>Team B</h4>
+            <ul style="text-align:right">
                 {% for name in md.team_b %}<li>{{ name }}</li>{% endfor %}
             </ul>
         </div>
     </div>
-</article>
+</div>
 {% endfor %}
 
 {% if not match_data %}
